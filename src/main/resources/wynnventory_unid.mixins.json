@@ -1,0 +1,15 @@
+{
+  "client": [
+    "PriceTooltipFactoryMixin",
+    "TrademarketItemSummaryMixin",
+    "WynntilsModMixin"
+  ],
+  "compatibilityLevel": "JAVA_21",
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "minVersion": "0.8",
+  "mixins": [],
+  "package": "com.wynnventory.unid.mixin",
+  "required": true
+}
