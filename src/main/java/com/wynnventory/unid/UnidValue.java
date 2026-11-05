@@ -85,7 +85,10 @@ public final class UnidValue {
 
     /** Expected proceeds of selling the unid: the seller's share of its price, weighted by liquidity. */
     public static double expectedSale(TrademarketItemSnapshot snapshot, boolean mythic) {
-        return netSale(unidPrice(snapshot), liquidity(snapshot, mythic));
+        Double price = unidPrice(snapshot);
+        // Unids under the min price get thrown away, so they're worth nothing.
+        if (price == null || price < UnidSettings.get().getUnidMinPrice()) return 0;
+        return netSale(price, liquidity(snapshot, mythic));
     }
 
     static double netSale(Double price, double liquidity) {

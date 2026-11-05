@@ -71,6 +71,23 @@ public class UnidValueTest {
         assertEquals(0, UnidValue.netSale(null, 1));
     }
 
+    @Test
+    void expectedSaleIsZeroUnderTheMinPrice() {
+        int minPrice = UnidSettings.get().getUnidMinPrice();
+
+        // Mythics skip the liquidity check, so only the price decides.
+        assertEquals(0, UnidValue.expectedSale(snapshotPricedAt(minPrice - 1), true));
+        assertEquals(minPrice / 1.05, UnidValue.expectedSale(snapshotPricedAt(minPrice), true), 1e-9);
+    }
+
+    private static TrademarketItemSnapshot snapshotPricedAt(int price) {
+        TrademarketItemSummary live = new TrademarketItemSummary();
+        live.setUnidentifiedLowestPrice(price);
+        live.setUnidentifiedMedian((double) price);
+        live.setUnidentifiedMovingMedian((double) price);
+        return new TrademarketItemSnapshot(live, null);
+    }
+
     private static TrademarketItemSnapshot snapshotWithCounts(int unidentified, int days) {
         return new TrademarketItemSnapshot(null, new CountedSummary(unidentified, days));
     }
