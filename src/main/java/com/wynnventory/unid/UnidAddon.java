@@ -18,29 +18,48 @@ import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 
-/** Loads the thresholds and registers /unidhighlight to change them; the listeners join via WynntilsModMixin. */
+/**
+ * Loads the thresholds and registers /unidhighlight (or /sls) to change them; the listeners join via
+ * WynntilsModMixin.
+ */
 public final class UnidAddon implements ClientModInitializer {
-    private static final int EMERALDS_PER_LE = 4096;
+    static final int EMERALDS_PER_LE = 4096;
+    private static final double MAX_LE = 100_000;
 
     @Override
     public void onInitializeClient() {
         UnidSettings.load();
 
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> {
+            dispatcher.register(command("unidhighlight"));
+            dispatcher.register(command("sls"));
+        });
+
+        KeyBindingHelper.registerKeyBinding(BlacklistFeature.TOGGLE_KEY);
+        KeyBindingHelper.registerKeyBinding(BlacklistFeature.MARK_PREVIOUS_KEY);
+        KeyBindingHelper.registerKeyBinding(BlacklistFeature.MARK_NEXT_KEY);
+    }
+
+    static int toEmeralds(double le) {
+        return (int) Math.round(Math.min(le, MAX_LE) * EMERALDS_PER_LE);
+    }
+
+    private static LiteralArgumentBuilder<FabricClientCommandSource> command(String name) {
         LiteralArgumentBuilder<FabricClientCommandSource> metric = literal("metric");
         for (UnidSettings.PriceMetric value : UnidSettings.PriceMetric.values()) {
             metric.then(literal(value.name().toLowerCase(Locale.ROOT))
                     .executes(ctx -> update(ctx.getSource(), s -> s.setUnidPriceMetric(value))));
         }
 
-        ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) -> dispatcher.register(literal(
-                        "unidhighlight")
-                .executes(ctx -> showSettings(ctx.getSource()))
+        return literal(name)
+                .executes(ctx -> openSettings())
                 .then(literal("on").executes(ctx -> update(ctx.getSource(), s -> s.setHighlightItems(true))))
                 .then(literal("off").executes(ctx -> update(ctx.getSource(), s -> s.setHighlightItems(false))))
                 .then(metric)
@@ -66,11 +85,14 @@ public final class UnidAddon implements ClientModInitializer {
                                         .suggests((ctx, builder) -> SharedSuggestionProvider.suggest(
                                                 UnidSettings.get().getBlacklist(), builder))
                                         .executes(ctx -> removeFromBlacklist(
-                                                ctx.getSource(), StringArgumentType.getString(ctx, "item"))))))));
+                                                ctx.getSource(), StringArgumentType.getString(ctx, "item"))))));
+    }
 
-        KeyBindingHelper.registerKeyBinding(BlacklistFeature.TOGGLE_KEY);
-        KeyBindingHelper.registerKeyBinding(BlacklistFeature.MARK_PREVIOUS_KEY);
-        KeyBindingHelper.registerKeyBinding(BlacklistFeature.MARK_NEXT_KEY);
+    private static int openSettings() {
+        Minecraft mc = Minecraft.getInstance();
+        // Deferred so the chat screen, which closes after the command runs, doesn't close the settings with it.
+        mc.schedule(() -> mc.setScreen(new UnidSettingsScreen(null)));
+        return 1;
     }
 
     private static String keyName(KeyMapping key) {
@@ -78,9 +100,7 @@ public final class UnidAddon implements ClientModInitializer {
     }
 
     private static int addToBlacklist(FabricClientCommandSource source, String input) {
-        // Store the item's own spelling, and refuse typos that would never match anything.
-        Optional<String> name =
-                BlacklistFeature.itemNames().filter(input::equalsIgnoreCase).findFirst();
+        Optional<String> name = BlacklistFeature.resolveItemName(input);
         if (name.isEmpty()) {
             source.sendError(Component.literal("No gear or ingredient is called " + input));
             return 0;
@@ -125,11 +145,10 @@ public final class UnidAddon implements ClientModInitializer {
     private static LiteralArgumentBuilder<FabricClientCommandSource> priceSetting(
             String name, ObjIntConsumer<UnidSettings> setter) {
         return literal(name)
-                .then(argument("le", DoubleArgumentType.doubleArg(0, 100_000))
+                .then(argument("le", DoubleArgumentType.doubleArg(0, MAX_LE))
                         .executes(ctx -> update(
                                 ctx.getSource(),
-                                s -> setter.accept(s, (int)
-                                        Math.round(DoubleArgumentType.getDouble(ctx, "le") * EMERALDS_PER_LE)))));
+                                s -> setter.accept(s, toEmeralds(DoubleArgumentType.getDouble(ctx, "le"))))));
     }
 
     private static int update(FabricClientCommandSource source, Consumer<UnidSettings> change) {
@@ -145,6 +164,7 @@ public final class UnidAddon implements ClientModInitializer {
                 + UnidValue.formatEmeralds(settings.getUnidMinPrice()) + ", " + settings.getMinUnidListingsPerDay()
                 + "+ listings/day"
                 + "\nBoxes: EV ≥ " + UnidValue.formatEmeralds(settings.getBoxMinEv())
+                + (settings.isZeroUnderMinPrice() ? ", items under the min price count as 0" : "")
                 + "\nIngredients: lowest price ≥ " + UnidValue.formatEmeralds(settings.getIngredientMinPrice())
                 + "\nBlacklist: " + settings.getBlacklist().size() + " items (/unidhighlight blacklist)"));
         return 1;

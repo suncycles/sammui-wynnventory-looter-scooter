@@ -32,6 +32,7 @@ public final class UnidSettings {
     private int unidMinPrice = 8192; // 2 LE
     private int minUnidListingsPerDay = 3;
     private int boxMinEv = 4096; // 1 LE
+    private boolean zeroUnderMinPrice = true;
     private int ingredientMinPrice = 2048; // 32 EB
     private List<String> blacklist = new ArrayList<>();
 
@@ -102,6 +103,15 @@ public final class UnidSettings {
 
     public void setBoxMinEv(int boxMinEv) {
         this.boxMinEv = boxMinEv;
+    }
+
+    /** Whether box EV counts possible items priced under the min unid price as worth nothing. */
+    public boolean isZeroUnderMinPrice() {
+        return zeroUnderMinPrice;
+    }
+
+    public void setZeroUnderMinPrice(boolean zeroUnderMinPrice) {
+        this.zeroUnderMinPrice = zeroUnderMinPrice;
     }
 
     public int getIngredientMinPrice() {

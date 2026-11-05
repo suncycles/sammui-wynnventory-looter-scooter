@@ -15,6 +15,7 @@ import com.wynnventory.feature.input.Keybinds;
 import com.wynnventory.util.ItemStackUtils;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -114,6 +115,11 @@ public class BlacklistFeature {
             case IngredientItem ingredient -> ingredient.getName();
             case null, default -> null;
         };
+    }
+
+    /** The item's own spelling of a typed name, or empty for a typo that would never match anything. */
+    static Optional<String> resolveItemName(String input) {
+        return itemNames().filter(input.trim()::equalsIgnoreCase).findFirst();
     }
 
     /** Every name the blacklist can hold, for command suggestions. */

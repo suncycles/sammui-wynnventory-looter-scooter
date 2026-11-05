@@ -87,7 +87,9 @@ public final class UnidValue {
     public static double expectedSale(TrademarketItemSnapshot snapshot, boolean mythic) {
         Double price = unidPrice(snapshot);
         // Unids under the min price get thrown away, so they're worth nothing.
-        if (price == null || price < UnidSettings.get().getUnidMinPrice()) return 0;
+        if (price == null) return 0;
+        UnidSettings settings = UnidSettings.get();
+        if (settings.isZeroUnderMinPrice() && price < settings.getUnidMinPrice()) return 0;
         return netSale(price, liquidity(snapshot, mythic));
     }
 

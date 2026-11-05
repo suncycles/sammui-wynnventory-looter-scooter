@@ -78,6 +78,13 @@ public class UnidValueTest {
         // Mythics skip the liquidity check, so only the price decides.
         assertEquals(0, UnidValue.expectedSale(snapshotPricedAt(minPrice - 1), true));
         assertEquals(minPrice / 1.05, UnidValue.expectedSale(snapshotPricedAt(minPrice), true), 1e-9);
+
+        UnidSettings.get().setZeroUnderMinPrice(false);
+        try {
+            assertEquals((minPrice - 1) / 1.05, UnidValue.expectedSale(snapshotPricedAt(minPrice - 1), true), 1e-9);
+        } finally {
+            UnidSettings.get().setZeroUnderMinPrice(true);
+        }
     }
 
     private static TrademarketItemSnapshot snapshotPricedAt(int price) {
