@@ -23,7 +23,9 @@ import net.neoforged.bus.api.SubscribeEvent;
 public class UnidHighlightFeature {
     private static final int STAR_COLOR = 0xFFFFFF55;
     private static final int STAR_OUTLINE_COLOR = 0xFF000000;
-    private static final float STAR_SCALE = 1.25f;
+    private static final float STAR_SCALE = 1.0f;
+    // Half a pixel, thinner than drawString's whole-pixel positions allow.
+    private static final float STAR_OUTLINE_WIDTH = 0.5f;
     // A faint fill: the frame does the job of standing out against Wynntils' rarity backgrounds.
     private static final int FILL_ALPHA = 0x4D000000;
     private static final int FRAME_WIDTH = 2;
@@ -56,7 +58,12 @@ public class UnidHighlightFeature {
         graphics.pose().scale(STAR_SCALE, STAR_SCALE);
         for (int dx = -1; dx <= 1; dx++) {
             for (int dy = -1; dy <= 1; dy++) {
-                if (dx != 0 || dy != 0) graphics.drawString(font, "★", dx, dy, STAR_OUTLINE_COLOR, false);
+                if (dx == 0 && dy == 0) continue;
+
+                graphics.pose().pushMatrix();
+                graphics.pose().translate(dx * STAR_OUTLINE_WIDTH, dy * STAR_OUTLINE_WIDTH);
+                graphics.drawString(font, "★", 0, 0, STAR_OUTLINE_COLOR, false);
+                graphics.pose().popMatrix();
             }
         }
         graphics.drawString(font, "★", 0, 0, STAR_COLOR, false);
