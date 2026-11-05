@@ -2,6 +2,7 @@ package com.wynnventory.unid;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
@@ -21,5 +22,16 @@ public class UnidSettingsTest {
         assertTrue(settings.removeFromBlacklist("apology"));
         assertFalse(settings.removeFromBlacklist("apology"));
         assertFalse(settings.isBlacklisted("Apology"));
+    }
+
+    @Test
+    void hexColorsReadShortAndLongFormsWithOrWithoutHash() {
+        assertEquals(0xFF0000, UnidSettings.parseHexColor("f00"));
+        assertEquals(0x00FF00, UnidSettings.parseHexColor("#0F0"));
+        assertEquals(0x00FFCC, UnidSettings.parseHexColor("#00ffcc"));
+        assertEquals(0x0000FF, UnidSettings.parseHexColor("0000FF"));
+        assertNull(UnidSettings.parseHexColor("#12345"));
+        assertNull(UnidSettings.parseHexColor("red"));
+        assertNull(UnidSettings.parseHexColor(""));
     }
 }

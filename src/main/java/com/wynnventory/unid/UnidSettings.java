@@ -27,7 +27,16 @@ public final class UnidSettings {
         AVERAGE
     }
 
+    /** How highlighted slots are drawn; every style also stars them. */
+    public enum HighlightStyle {
+        FRAME,
+        FILL,
+        PULSE
+    }
+
     private boolean highlightItems = true;
+    private HighlightStyle highlightStyle = HighlightStyle.FRAME;
+    private int highlightColor = 0x00FFCC; // WynnVentory's default teal
     private PriceMetric unidPriceMetric = PriceMetric.ROBUST;
     private int unidMinPrice = 8192; // 2 LE
     private int minUnidListingsPerDay = 3;
@@ -70,6 +79,33 @@ public final class UnidSettings {
 
     public void setHighlightItems(boolean highlightItems) {
         this.highlightItems = highlightItems;
+    }
+
+    public HighlightStyle getHighlightStyle() {
+        // Gson reads a misspelled style in the file as null.
+        return highlightStyle == null ? HighlightStyle.FRAME : highlightStyle;
+    }
+
+    public void setHighlightStyle(HighlightStyle highlightStyle) {
+        this.highlightStyle = highlightStyle;
+    }
+
+    /** The highlight color as 0xRRGGBB. */
+    public int getHighlightColor() {
+        return highlightColor & 0xFFFFFF;
+    }
+
+    public void setHighlightColor(int highlightColor) {
+        this.highlightColor = highlightColor & 0xFFFFFF;
+    }
+
+    /** Reads #RGB or #RRGGBB, with or without the #, as 0xRRGGBB; null for anything else. */
+    static Integer parseHexColor(String text) {
+        String hex = text.strip();
+        if (hex.startsWith("#")) hex = hex.substring(1);
+        if (!hex.matches("[0-9a-fA-F]{3}|[0-9a-fA-F]{6}")) return null;
+        if (hex.length() == 3) hex = hex.replaceAll("(.)", "$1$1");
+        return Integer.parseInt(hex, 16);
     }
 
     public int getUnidMinPrice() {

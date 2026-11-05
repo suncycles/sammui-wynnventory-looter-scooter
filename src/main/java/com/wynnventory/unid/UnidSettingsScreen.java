@@ -1,5 +1,6 @@
 package com.wynnventory.unid;
 
+import com.wynnventory.unid.UnidSettings.HighlightStyle;
 import com.wynnventory.unid.UnidSettings.PriceMetric;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -9,6 +10,7 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.components.EditBox;
@@ -36,12 +38,26 @@ public class UnidSettingsScreen extends OptionsSubScreen {
         list.addSmall(
                 CycleButton.onOffBuilder(settings.isHighlightItems())
                         .create(Component.literal("Highlighting"), (button, on) -> settings.setHighlightItems(on)),
-                CycleButton.builder(UnidSettingsScreen::metricName, settings.getUnidPriceMetric())
+                CycleButton.builder(UnidSettingsScreen::enumName, settings.getUnidPriceMetric())
                         .withValues(PriceMetric.values())
                         .withTooltip(metric -> Tooltip.create(metricTooltip(metric)))
                         .create(
                                 Component.literal("Unid price"),
                                 (button, metric) -> settings.setUnidPriceMetric(metric)));
+
+        list.addHeader(Component.literal("Highlight"));
+        EditBox hexBox = colorBox();
+        list.addSmall(
+                CycleButton.builder(UnidSettingsScreen::enumName, settings.getHighlightStyle())
+                        .withValues(HighlightStyle.values())
+                        .withTooltip(style -> Tooltip.create(styleTooltip(style)))
+                        .create(Component.literal("Style"), (button, style) -> settings.setHighlightStyle(style)),
+                hexBox);
+        list.addSmall(List.of(
+                preset("Red #F00", 0xFF0000, hexBox),
+                preset("Green #0F0", 0x00FF00, hexBox),
+                preset("Blue #00F", 0x0000FF, hexBox),
+                preset("Teal #0FC", 0x00FFCC, hexBox)));
 
         list.addHeader(Component.literal("Unidentified gear"));
         list.addSmall(label("Min unid price (LE)"), priceBox(settings.getUnidMinPrice(), settings::setUnidMinPrice));
@@ -111,6 +127,37 @@ public class UnidSettingsScreen extends OptionsSubScreen {
         list.setScrollAmount(scroll);
     }
 
+    /** A hex box for the highlight color, with a swatch of the color at its right end. */
+    private EditBox colorBox() {
+        EditBox box = new EditBox(font, 0, 0, WIDTH, HEIGHT, Component.literal("Highlight color")) {
+            @Override
+            public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+                super.renderWidget(graphics, mouseX, mouseY, partialTick);
+                int color = 0xFF000000 | UnidSettings.get().getHighlightColor();
+                graphics.fill(getRight() - 16, getY() + 4, getRight() - 4, getBottom() - 4, color);
+            }
+        };
+        box.setMaxLength(7);
+        box.setValue(String.format("#%06X", UnidSettings.get().getHighlightColor()));
+        box.setFilter(text -> text.matches("#?[0-9a-fA-F]{0,6}"));
+        box.setTooltip(Tooltip.create(Component.literal("Highlight color as hex, like #F00 or #00FFCC")));
+        // Red until the text is a whole color; the last whole color stays in use meanwhile.
+        box.setResponder(text -> {
+            Integer color = UnidSettings.parseHexColor(text);
+            box.setTextColor(color == null ? ERROR_COLOR : TEXT_COLOR);
+            if (color != null) UnidSettings.get().setHighlightColor(color);
+        });
+        return box;
+    }
+
+    private Button preset(String name, int color, EditBox hexBox) {
+        return Button.builder(
+                        Component.literal(name).withColor(color),
+                        button -> hexBox.setValue(String.format("#%06X", color)))
+                .width(WIDTH)
+                .build();
+    }
+
     private StringWidget label(String text) {
         return new StringWidget(WIDTH, HEIGHT, Component.literal(text), font);
     }
@@ -135,9 +182,18 @@ public class UnidSettingsScreen extends OptionsSubScreen {
         return box;
     }
 
-    private static Component metricName(PriceMetric metric) {
-        String name = metric.name();
+    private static Component enumName(Enum<?> value) {
+        String name = value.name();
         return Component.literal(name.charAt(0) + name.substring(1).toLowerCase(Locale.ROOT));
+    }
+
+    private static Component styleTooltip(HighlightStyle style) {
+        return Component.literal(
+                switch (style) {
+                    case FRAME -> "A solid border around the slot over a faint fill.";
+                    case FILL -> "A half-transparent fill behind the item.";
+                    case PULSE -> "A fill that fades in and out.";
+                });
     }
 
     private static Component metricTooltip(PriceMetric metric) {

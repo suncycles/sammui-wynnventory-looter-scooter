@@ -7,7 +7,6 @@ import com.wynntils.models.items.items.game.GearItem;
 import com.wynntils.models.items.items.game.IngredientItem;
 import com.wynntils.utils.mc.McUtils;
 import com.wynnventory.api.service.TrademarketService;
-import com.wynnventory.core.config.ModConfig;
 import com.wynnventory.model.item.trademarket.TrademarketItemSnapshot;
 import com.wynnventory.util.ItemStackUtils;
 import net.minecraft.client.gui.Font;
@@ -26,8 +25,12 @@ public class UnidHighlightFeature {
     private static final float STAR_SCALE = 1.0f;
     // Half a pixel, thinner than drawString's whole-pixel positions allow.
     private static final float STAR_OUTLINE_WIDTH = 0.5f;
-    // A faint fill: the frame does the job of standing out against Wynntils' rarity backgrounds.
-    private static final int FILL_ALPHA = 0x4D000000;
+    // With a frame the fill stays faint: the frame does the job of standing out against Wynntils' rarity backgrounds.
+    private static final int FRAME_FILL_ALPHA = 0x4D;
+    private static final int FILL_ALPHA = 0x80;
+    private static final int PULSE_MIN_ALPHA = 0x26;
+    private static final int PULSE_MAX_ALPHA = 0xE6;
+    private static final long PULSE_PERIOD_MS = 2200;
     private static final int FRAME_WIDTH = 2;
 
     @SubscribeEvent
@@ -37,8 +40,21 @@ public class UnidHighlightFeature {
         Slot slot = event.getSlot();
         if (!isHighlighted(slot.getItem())) return;
 
+        int alpha =
+                switch (UnidSettings.get().getHighlightStyle()) {
+                    case FRAME -> FRAME_FILL_ALPHA;
+                    case FILL -> FILL_ALPHA;
+                    case PULSE -> pulseAlpha();
+                };
         // Pre runs before the item renders, so the fill sits behind it like Wynntils' own slot highlights.
-        event.getGuiGraphics().fill(slot.x, slot.y, slot.x + 16, slot.y + 16, FILL_ALPHA | highlightColor());
+        event.getGuiGraphics().fill(slot.x, slot.y, slot.x + 16, slot.y + 16, alpha << 24 | highlightColor());
+    }
+
+    /** Fades from faint to strong and back once per period. */
+    private static int pulseAlpha() {
+        double phase = System.currentTimeMillis() % PULSE_PERIOD_MS / (double) PULSE_PERIOD_MS;
+        double wave = 0.5 - 0.5 * Math.cos(2 * Math.PI * phase);
+        return (int) (PULSE_MIN_ALPHA + (PULSE_MAX_ALPHA - PULSE_MIN_ALPHA) * wave);
     }
 
     @SubscribeEvent
@@ -50,7 +66,7 @@ public class UnidHighlightFeature {
 
         // Post runs after the item renders, so the frame and star sit on top of it.
         GuiGraphics graphics = event.getGuiGraphics();
-        drawFrame(graphics, slot);
+        if (UnidSettings.get().getHighlightStyle() == UnidSettings.HighlightStyle.FRAME) drawFrame(graphics, slot);
 
         Font font = McUtils.mc().font;
         graphics.pose().pushMatrix();
@@ -83,9 +99,8 @@ public class UnidHighlightFeature {
         graphics.fill(right - FRAME_WIDTH, top + FRAME_WIDTH, right, bottom - FRAME_WIDTH, color);
     }
 
-    // Same color as WynnVentory's own price highlighting.
     private static int highlightColor() {
-        return ModConfig.getInstance().getPriceHighlightSettings().getHighlightColor();
+        return UnidSettings.get().getHighlightColor();
     }
 
     static boolean isHighlighted(ItemStack stack) {

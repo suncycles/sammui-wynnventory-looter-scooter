@@ -5,7 +5,6 @@ import com.wynntils.models.gear.type.GearInfo;
 import com.wynntils.models.gear.type.GearTier;
 import com.wynntils.models.items.items.game.GearBoxItem;
 import com.wynnventory.api.service.TrademarketService;
-import com.wynnventory.core.config.ModConfig;
 import com.wynnventory.model.item.trademarket.TrademarketItemSnapshot;
 import java.time.Duration;
 import java.time.Instant;
@@ -57,7 +56,7 @@ public record GearBoxValue(int possible, int priced, List<GearInfo> hits, double
     }
 
     public List<Component> tooltipLines() {
-        int color = ModConfig.getInstance().getPriceHighlightSettings().getHighlightColor();
+        int color = UnidSettings.get().getHighlightColor();
         List<Component> lines = new ArrayList<>();
         lines.add(Component.literal("Box EV (net): " + UnidValue.formatEmeralds((int) expectedValue) + " (" + priced
                         + "/" + possible + " priced, " + hits.size() + " hits)")
