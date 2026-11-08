@@ -18,7 +18,13 @@ import net.minecraft.network.chat.Component;
 /**
  * What selling an unidentified gear box's unid is expected to net, if every possible gear is equally likely to drop.
  */
-public record GearBoxValue(int possible, int priced, List<GearInfo> hits, double expectedValue, Instant computedAt) {
+public record GearBoxValue(
+        int possible,
+        int priced,
+        List<GearInfo> hits,
+        double expectedValue,
+        boolean canDropFavorite,
+        Instant computedAt) {
     // Slots re-render every frame while prices arrive asynchronously; a second-old answer is fresh enough.
     private static final Duration MAX_AGE = Duration.ofSeconds(1);
     private static final Map<GearBoxItem, GearBoxValue> CACHE = new HashMap<>();
@@ -52,11 +58,13 @@ public record GearBoxValue(int possible, int priced, List<GearInfo> hits, double
 
         // Gears without an unid price add 0: no market (or not fetched yet), which `priced` makes visible.
         double expectedValue = gears.isEmpty() ? 0 : total / gears.size();
-        return new GearBoxValue(gears.size(), priced, hits, expectedValue, Instant.now());
+        boolean canDropFavorite =
+                gears.stream().anyMatch(info -> UnidSettings.get().isFavorite(info.name()));
+        return new GearBoxValue(gears.size(), priced, hits, expectedValue, canDropFavorite, Instant.now());
     }
 
     public List<Component> tooltipLines() {
-        int color = UnidSettings.get().getHighlightColor();
+        int color = UnidSettings.get().getItemLook().getColor();
         List<Component> lines = new ArrayList<>();
         lines.add(Component.literal("Box EV (net): " + UnidValue.formatEmeralds((int) expectedValue) + " (" + priced
                         + "/" + possible + " priced, " + hits.size() + " hits)")

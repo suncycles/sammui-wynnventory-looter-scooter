@@ -33,11 +33,13 @@ import net.neoforged.bus.api.SubscribeEvent;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * Blacklisted gear and ingredients are never highlighted, add nothing to box EV and are crossed out in box tooltips.
- * The toggle key works on the hovered item, or on a box, on the possible item marked with the arrow keys.
+ * Blacklisted gear and ingredients are never highlighted, add nothing to box EV and are crossed out in box tooltips;
+ * favorites are always highlighted and shown bold in their color. The blacklist and favorite keys work on the hovered
+ * item, or on a box, on the possible item marked with the arrow keys.
  */
 public class BlacklistFeature {
     public static final KeyMapping TOGGLE_KEY = key("toggleBlacklist", GLFW.GLFW_KEY_B);
+    public static final KeyMapping FAVORITE_KEY = key("toggleFavorite", GLFW.GLFW_KEY_V);
     public static final KeyMapping MARK_PREVIOUS_KEY = key("markPrevious", GLFW.GLFW_KEY_UP);
     public static final KeyMapping MARK_NEXT_KEY = key("markNext", GLFW.GLFW_KEY_DOWN);
 
@@ -67,9 +69,7 @@ public class BlacklistFeature {
             if (step != 0) {
                 int index = shownNames.indexOf(markedName) + step;
                 markedName = shownNames.get(Math.floorMod(index, shownNames.size()));
-            } else if (TOGGLE_KEY.matches(key)) {
-                toggle(markedName);
-            } else {
+            } else if (!toggleList(key, markedName)) {
                 return;
             }
             event.setCanceled(true);
@@ -77,10 +77,28 @@ public class BlacklistFeature {
         }
 
         String name = itemName(slot.getItem());
-        if (name == null || !TOGGLE_KEY.matches(key)) return;
+        if (name != null && toggleList(key, name)) event.setCanceled(true);
+    }
 
-        event.setCanceled(true);
-        toggle(name);
+    /** Toggles the item on the list the key belongs to; false if it's neither list's key. */
+    private static boolean toggleList(KeyEvent key, String name) {
+        UnidSettings settings = UnidSettings.get();
+        String message;
+        if (TOGGLE_KEY.matches(key)) {
+            boolean blacklisted = !settings.removeFromBlacklist(name);
+            if (blacklisted) settings.addToBlacklist(name);
+            message = blacklisted ? "Blacklisted " + name : "Removed " + name + " from blacklist";
+        } else if (FAVORITE_KEY.matches(key)) {
+            boolean favorite = !settings.removeFromFavorites(name);
+            if (favorite) settings.addToFavorites(name);
+            message = favorite ? "Favorited " + name : "Removed " + name + " from favorites";
+        } else {
+            return false;
+        }
+
+        UnidSettings.save();
+        McUtils.mc().gui.setOverlayMessage(Component.literal(message), false);
+        return true;
     }
 
     // LOWEST runs after Wynntils' item guess has listed the box's possible gear.
@@ -129,19 +147,7 @@ public class BlacklistFeature {
                 Models.Ingredient.getAllIngredientInfos().map(IngredientInfo::name));
     }
 
-    private static void toggle(String name) {
-        UnidSettings settings = UnidSettings.get();
-        boolean blacklisted = !settings.removeFromBlacklist(name);
-        if (blacklisted) settings.addToBlacklist(name);
-        UnidSettings.save();
-        McUtils.mc()
-                .gui
-                .setOverlayMessage(
-                        Component.literal(blacklisted ? "Blacklisted " + name : "Removed " + name + " from blacklist"),
-                        false);
-    }
-
-    /** Copies a tooltip line, crossing out blacklisted names and marking the marked one. */
+    /** Copies a tooltip line, crossing out blacklisted names, bolding favorites and marking the marked one. */
     private Component restyle(Component component) {
         MutableComponent copy = MutableComponent.create(component.getContents()).setStyle(component.getStyle());
         for (Component sibling : component.getSiblings()) {
@@ -154,6 +160,9 @@ public class BlacklistFeature {
             // Half brightness keeps the tier color recognisable.
             int darker = color == null ? UNCOLORED : (color.getValue() >> 1) & 0x7F7F7F;
             copy.withStyle(style -> style.withStrikethrough(true).withColor(darker));
+        } else if (UnidSettings.get().isFavorite(text.text())) {
+            int color = UnidSettings.get().getFavoriteLook().getColor();
+            copy.withStyle(style -> style.withBold(true).withColor(color));
         }
         if (!text.text().equals(markedName)) return copy;
 

@@ -27,16 +27,108 @@ public final class UnidSettings {
         AVERAGE
     }
 
-    /** How highlighted slots are drawn; every style also stars them. */
-    public enum HighlightStyle {
+    /** Drawn over the slot's edge, or across it. */
+    public enum Shape {
+        NONE,
         FRAME,
-        FILL,
-        PULSE
+        CORNERS,
+        DOUBLE_FRAME,
+        DASHED_FRAME,
+        SLASH
+    }
+
+    /** Drawn behind the item, except DIM, which darkens the item itself. */
+    public enum Fill {
+        NONE,
+        FAINT,
+        HALF,
+        PULSE,
+        DIM
+    }
+
+    /** A glyph in the slot's top-left corner, in its own color unless the look sets one. */
+    public enum Marker {
+        NONE("", 0),
+        STAR("★", 0xFFFFFF55),
+        DIAMOND("◆", 0xFFFFC800),
+        CROSS("✕", 0xFFFF4A4A);
+
+        public final String glyph;
+        public final int color;
+
+        Marker(String glyph, int color) {
+            this.glyph = glyph;
+            this.color = color;
+        }
+    }
+
+    /** How one kind of slot is drawn; the shape and fill use its color, the marker its own. */
+    public static final class Look {
+        private Shape shape;
+        private Fill fill;
+        private Marker marker;
+        private int color;
+        // Null until set: the marker's own color.
+        private Integer markerColor;
+
+        Look(Shape shape, Fill fill, Marker marker, int color, Integer markerColor) {
+            this.shape = shape;
+            this.fill = fill;
+            this.marker = marker;
+            this.color = color;
+            this.markerColor = markerColor;
+        }
+
+        // Gson reads a misspelled value in the file as null.
+        public Shape getShape() {
+            return shape == null ? Shape.NONE : shape;
+        }
+
+        public void setShape(Shape shape) {
+            this.shape = shape;
+        }
+
+        public Fill getFill() {
+            return fill == null ? Fill.NONE : fill;
+        }
+
+        public void setFill(Fill fill) {
+            this.fill = fill;
+        }
+
+        public Marker getMarker() {
+            return marker == null ? Marker.NONE : marker;
+        }
+
+        public void setMarker(Marker marker) {
+            this.marker = marker;
+        }
+
+        /** The color as 0xRRGGBB. */
+        public int getColor() {
+            return color & 0xFFFFFF;
+        }
+
+        public void setColor(int color) {
+            this.color = color & 0xFFFFFF;
+        }
+
+        /** The marker color as 0xRRGGBB. */
+        public int getMarkerColor() {
+            return markerColor != null ? markerColor & 0xFFFFFF : getMarker().color & 0xFFFFFF;
+        }
+
+        public void setMarkerColor(int markerColor) {
+            this.markerColor = markerColor & 0xFFFFFF;
+        }
     }
 
     private boolean highlightItems = true;
-    private HighlightStyle highlightStyle = HighlightStyle.FRAME;
-    private int highlightColor = 0x00FFCC; // WynnVentory's default teal
+    // Boxes and items start as the frame and star they always had, in WynnVentory's default teal.
+    private Look boxLook = new Look(Shape.FRAME, Fill.FAINT, Marker.STAR, 0x00FFCC, null);
+    private Look itemLook = new Look(Shape.FRAME, Fill.FAINT, Marker.STAR, 0x00FFCC, null);
+    private Look blacklistLook = new Look(Shape.NONE, Fill.DIM, Marker.CROSS, 0xFF4A4A, null);
+    private Look favoriteLook = new Look(Shape.FRAME, Fill.FAINT, Marker.STAR, 0xFF55FF, 0xFFFFFF);
     private PriceMetric unidPriceMetric = PriceMetric.ROBUST;
     private int unidMinPrice = 8192; // 2 LE
     private int minUnidListingsPerDay = 3;
@@ -44,6 +136,7 @@ public final class UnidSettings {
     private boolean zeroUnderMinPrice = true;
     private int ingredientMinPrice = 2048; // 32 EB
     private List<String> blacklist = new ArrayList<>();
+    private List<String> favorites = new ArrayList<>();
 
     public static UnidSettings get() {
         return instance;
@@ -81,22 +174,22 @@ public final class UnidSettings {
         this.highlightItems = highlightItems;
     }
 
-    public HighlightStyle getHighlightStyle() {
-        // Gson reads a misspelled style in the file as null.
-        return highlightStyle == null ? HighlightStyle.FRAME : highlightStyle;
+    public Look getBoxLook() {
+        return boxLook;
     }
 
-    public void setHighlightStyle(HighlightStyle highlightStyle) {
-        this.highlightStyle = highlightStyle;
+    public Look getItemLook() {
+        return itemLook;
     }
 
-    /** The highlight color as 0xRRGGBB. */
-    public int getHighlightColor() {
-        return highlightColor & 0xFFFFFF;
+    /** For blacklisted gear and ingredients, which are never highlighted as valuable. */
+    public Look getBlacklistLook() {
+        return blacklistLook;
     }
 
-    public void setHighlightColor(int highlightColor) {
-        this.highlightColor = highlightColor & 0xFFFFFF;
+    /** For favorite gear and ingredients, and boxes that can drop them, highlighted whatever they're worth. */
+    public Look getFavoriteLook() {
+        return favoriteLook;
     }
 
     /** Reads #RGB or #RRGGBB, with or without the #, as 0xRRGGBB; null for anything else. */
@@ -163,20 +256,52 @@ public final class UnidSettings {
     }
 
     public boolean isBlacklisted(String name) {
-        return blacklist.stream().anyMatch(name::equalsIgnoreCase);
+        return contains(blacklist, name);
     }
 
-    /** Returns false if the item was already blacklisted. */
+    /** Returns false if the item was already blacklisted; a blacklisted item stops being a favorite. */
     public boolean addToBlacklist(String name) {
-        if (isBlacklisted(name)) return false;
-
-        blacklist.add(name);
-        blacklist.sort(String.CASE_INSENSITIVE_ORDER);
-        return true;
+        removeFrom(favorites, name);
+        return addTo(blacklist, name);
     }
 
     /** Returns false if the item wasn't blacklisted. */
     public boolean removeFromBlacklist(String name) {
-        return blacklist.removeIf(name::equalsIgnoreCase);
+        return removeFrom(blacklist, name);
+    }
+
+    public List<String> getFavorites() {
+        return favorites;
+    }
+
+    public boolean isFavorite(String name) {
+        return contains(favorites, name);
+    }
+
+    /** Returns false if the item was already a favorite; a favorite stops being blacklisted. */
+    public boolean addToFavorites(String name) {
+        removeFrom(blacklist, name);
+        return addTo(favorites, name);
+    }
+
+    /** Returns false if the item wasn't a favorite. */
+    public boolean removeFromFavorites(String name) {
+        return removeFrom(favorites, name);
+    }
+
+    private static boolean contains(List<String> names, String name) {
+        return names.stream().anyMatch(name::equalsIgnoreCase);
+    }
+
+    private static boolean addTo(List<String> names, String name) {
+        if (contains(names, name)) return false;
+
+        names.add(name);
+        names.sort(String.CASE_INSENSITIVE_ORDER);
+        return true;
+    }
+
+    private static boolean removeFrom(List<String> names, String name) {
+        return names.removeIf(name::equalsIgnoreCase);
     }
 }

@@ -25,6 +25,20 @@ public class UnidSettingsTest {
     }
 
     @Test
+    void anItemIsEitherAFavoriteOrBlacklistedNeverBoth() {
+        UnidSettings settings = new UnidSettings();
+
+        settings.addToBlacklist("Skyfall");
+        assertTrue(settings.addToFavorites("skyfall"));
+        assertTrue(settings.isFavorite("Skyfall"));
+        assertFalse(settings.isBlacklisted("Skyfall"));
+
+        settings.addToBlacklist("Skyfall");
+        assertTrue(settings.isBlacklisted("Skyfall"));
+        assertFalse(settings.isFavorite("Skyfall"));
+    }
+
+    @Test
     void hexColorsReadShortAndLongFormsWithOrWithoutHash() {
         assertEquals(0xFF0000, UnidSettings.parseHexColor("f00"));
         assertEquals(0x00FF00, UnidSettings.parseHexColor("#0F0"));

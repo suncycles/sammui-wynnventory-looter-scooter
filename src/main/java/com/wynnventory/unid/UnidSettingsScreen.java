@@ -1,7 +1,10 @@
 package com.wynnventory.unid;
 
-import com.wynnventory.unid.UnidSettings.HighlightStyle;
+import com.wynnventory.unid.UnidSettings.Fill;
+import com.wynnventory.unid.UnidSettings.Look;
+import com.wynnventory.unid.UnidSettings.Marker;
 import com.wynnventory.unid.UnidSettings.PriceMetric;
+import com.wynnventory.unid.UnidSettings.Shape;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.List;
@@ -9,6 +12,7 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
+import java.util.function.IntSupplier;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -27,6 +31,13 @@ public class UnidSettingsScreen extends OptionsSubScreen {
     private static final int TEXT_COLOR = 0xFFE0E0E0;
     private static final int ERROR_COLOR = 0xFFFF5555;
     private static final DecimalFormat LE = new DecimalFormat("0.###", DecimalFormatSymbols.getInstance(Locale.ROOT));
+    private static final List<Preset> PRESETS = List.of(
+            new Preset("Red #F00", 0xFF0000),
+            new Preset("Green #0F0", 0x00FF00),
+            new Preset("Blue #00F", 0x0000FF),
+            new Preset("Teal #0FC", 0x00FFCC));
+
+    private record Preset(String name, int color) {}
 
     public UnidSettingsScreen(Screen parent) {
         super(parent, Minecraft.getInstance().options, Component.literal("sammui wynnventory looter scooter"));
@@ -45,19 +56,10 @@ public class UnidSettingsScreen extends OptionsSubScreen {
                                 Component.literal("Unid price"),
                                 (button, metric) -> settings.setUnidPriceMetric(metric)));
 
-        list.addHeader(Component.literal("Highlight"));
-        EditBox hexBox = colorBox();
-        list.addSmall(
-                CycleButton.builder(UnidSettingsScreen::enumName, settings.getHighlightStyle())
-                        .withValues(HighlightStyle.values())
-                        .withTooltip(style -> Tooltip.create(styleTooltip(style)))
-                        .create(Component.literal("Style"), (button, style) -> settings.setHighlightStyle(style)),
-                hexBox);
-        list.addSmall(List.of(
-                preset("Red #F00", 0xFF0000, hexBox),
-                preset("Green #0F0", 0x00FF00, hexBox),
-                preset("Blue #00F", 0x0000FF, hexBox),
-                preset("Teal #0FC", 0x00FFCC, hexBox)));
+        addLook("Box look", settings.getBoxLook());
+        addLook("Item look", settings.getItemLook());
+        addLook("Favorite look", settings.getFavoriteLook());
+        addLook("Blacklisted look", settings.getBlacklistLook());
 
         list.addHeader(Component.literal("Unidentified gear"));
         list.addSmall(label("Min unid price (LE)"), priceBox(settings.getUnidMinPrice(), settings::setUnidMinPrice));
@@ -81,26 +83,8 @@ public class UnidSettingsScreen extends OptionsSubScreen {
                 label("Min lowest price (LE)"),
                 priceBox(settings.getIngredientMinPrice(), settings::setIngredientMinPrice));
 
-        list.addHeader(Component.literal("Blacklist"));
-        EditBox nameBox = new EditBox(font, 0, 0, WIDTH, HEIGHT, Component.literal("Item name"));
-        nameBox.setMaxLength(64);
-        nameBox.setHint(Component.literal("Exact item name"));
-        nameBox.setResponder(value -> nameBox.setTextColor(TEXT_COLOR));
-        list.addSmall(
-                nameBox,
-                Button.builder(Component.literal("Add"), button -> addToBlacklist(nameBox))
-                        .width(WIDTH)
-                        .build());
-        for (String item : settings.getBlacklist()) {
-            list.addSmall(
-                    label(item),
-                    Button.builder(Component.literal("Remove"), button -> {
-                                settings.removeFromBlacklist(item);
-                                refresh();
-                            })
-                            .width(WIDTH)
-                            .build());
-        }
+        addNameList("Favorites", settings.getFavorites(), settings::addToFavorites, settings::removeFromFavorites);
+        addNameList("Blacklist", settings.getBlacklist(), settings::addToBlacklist, settings::removeFromBlacklist);
     }
 
     @Override
@@ -109,53 +93,104 @@ public class UnidSettingsScreen extends OptionsSubScreen {
         UnidSettings.save();
     }
 
-    private void addToBlacklist(EditBox nameBox) {
+    /** An add box, then every name on the list with a remove button. */
+    private void addNameList(String title, List<String> names, Consumer<String> add, Consumer<String> remove) {
+        list.addHeader(Component.literal(title));
+        EditBox nameBox = new EditBox(font, 0, 0, WIDTH, HEIGHT, Component.literal("Item name"));
+        nameBox.setMaxLength(64);
+        nameBox.setHint(Component.literal("Exact item name"));
+        nameBox.setResponder(value -> nameBox.setTextColor(TEXT_COLOR));
+        list.addSmall(
+                nameBox,
+                Button.builder(Component.literal("Add"), button -> addName(nameBox, add))
+                        .width(WIDTH)
+                        .build());
+        for (String item : names) {
+            list.addSmall(
+                    label(item),
+                    Button.builder(Component.literal("Remove"), button -> {
+                                remove.accept(item);
+                                refresh();
+                            })
+                            .width(WIDTH)
+                            .build());
+        }
+    }
+
+    private void addName(EditBox nameBox, Consumer<String> add) {
         Optional<String> name = BlacklistFeature.resolveItemName(nameBox.getValue());
         if (name.isEmpty()) {
             nameBox.setTextColor(ERROR_COLOR);
             return;
         }
 
-        UnidSettings.get().addToBlacklist(name.get());
+        add.accept(name.get());
         refresh();
     }
 
-    // Rebuilt so the list matches the blacklist; without restoring it, the scroll position jumps to the top.
+    // Rebuilt so the lists match the settings; without restoring it, the scroll position jumps to the top.
     private void refresh() {
         double scroll = list.scrollAmount();
         rebuildWidgets();
         list.setScrollAmount(scroll);
     }
 
-    /** A hex box for the highlight color, with a swatch of the color at its right end. */
-    private EditBox colorBox() {
-        EditBox box = new EditBox(font, 0, 0, WIDTH, HEIGHT, Component.literal("Highlight color")) {
+    private void addLook(String title, Look look) {
+        list.addHeader(Component.literal(title));
+        list.addSmall(
+                cycle("Shape", Shape.values(), look.getShape(), look::setShape),
+                cycle("Fill", Fill.values(), look.getFill(), look::setFill));
+        EditBox hexBox = colorBox(look::getColor, look::setColor, "Color as hex, like #F00 or #00FFCC");
+        Preset current = PRESETS.stream()
+                .filter(preset -> preset.color() == look.getColor())
+                .findFirst()
+                .orElse(PRESETS.getFirst());
+        list.addSmall(
+                CycleButton.builder(
+                                (Preset preset) ->
+                                        Component.literal(preset.name()).withColor(preset.color()),
+                                current)
+                        .withValues(PRESETS)
+                        .create(
+                                Component.literal("Color preset"),
+                                (button, preset) -> hexBox.setValue(hex(preset.color()))),
+                hexBox);
+        list.addSmall(
+                cycle("Marker", Marker.values(), look.getMarker(), look::setMarker),
+                colorBox(look::getMarkerColor, look::setMarkerColor, "Marker color as hex, like #FF5 or #FFFFFF"));
+    }
+
+    private static <T extends Enum<T>> CycleButton<T> cycle(String label, T[] values, T value, Consumer<T> setter) {
+        return CycleButton.builder(UnidSettingsScreen::enumName, value)
+                .withValues(values)
+                .create(Component.literal(label), (button, chosen) -> setter.accept(chosen));
+    }
+
+    /** A hex color box, with a swatch of the color at its right end. */
+    private EditBox colorBox(IntSupplier getter, IntConsumer setter, String tooltip) {
+        EditBox box = new EditBox(font, 0, 0, WIDTH, HEIGHT, Component.literal(tooltip)) {
             @Override
             public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
                 super.renderWidget(graphics, mouseX, mouseY, partialTick);
-                int color = 0xFF000000 | UnidSettings.get().getHighlightColor();
-                graphics.fill(getRight() - 16, getY() + 4, getRight() - 4, getBottom() - 4, color);
+                graphics.fill(
+                        getRight() - 16, getY() + 4, getRight() - 4, getBottom() - 4, 0xFF000000 | getter.getAsInt());
             }
         };
         box.setMaxLength(7);
-        box.setValue(String.format("#%06X", UnidSettings.get().getHighlightColor()));
+        box.setValue(hex(getter.getAsInt()));
         box.setFilter(text -> text.matches("#?[0-9a-fA-F]{0,6}"));
-        box.setTooltip(Tooltip.create(Component.literal("Highlight color as hex, like #F00 or #00FFCC")));
+        box.setTooltip(Tooltip.create(Component.literal(tooltip)));
         // Red until the text is a whole color; the last whole color stays in use meanwhile.
         box.setResponder(text -> {
             Integer color = UnidSettings.parseHexColor(text);
             box.setTextColor(color == null ? ERROR_COLOR : TEXT_COLOR);
-            if (color != null) UnidSettings.get().setHighlightColor(color);
+            if (color != null) setter.accept(color);
         });
         return box;
     }
 
-    private Button preset(String name, int color, EditBox hexBox) {
-        return Button.builder(
-                        Component.literal(name).withColor(color),
-                        button -> hexBox.setValue(String.format("#%06X", color)))
-                .width(WIDTH)
-                .build();
+    private static String hex(int color) {
+        return String.format("#%06X", color);
     }
 
     private StringWidget label(String text) {
@@ -183,17 +218,8 @@ public class UnidSettingsScreen extends OptionsSubScreen {
     }
 
     private static Component enumName(Enum<?> value) {
-        String name = value.name();
+        String name = value.name().replace('_', ' ');
         return Component.literal(name.charAt(0) + name.substring(1).toLowerCase(Locale.ROOT));
-    }
-
-    private static Component styleTooltip(HighlightStyle style) {
-        return Component.literal(
-                switch (style) {
-                    case FRAME -> "A solid border around the slot over a faint fill.";
-                    case FILL -> "A half-transparent fill behind the item.";
-                    case PULSE -> "A fill that fades in and out.";
-                });
     }
 
     private static Component metricTooltip(PriceMetric metric) {
