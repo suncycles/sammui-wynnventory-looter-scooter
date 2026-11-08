@@ -128,11 +128,13 @@ public class UnidSettingsScreen extends OptionsSubScreen {
         refresh();
     }
 
-    // Rebuilt so the lists match the settings; without restoring it, the scroll position jumps to the top.
+    // Reopened so the lists match the settings. Not rebuildWidgets(): that adds everything to the same layout again,
+    // stacking a second list and Done button over the first.
     private void refresh() {
         double scroll = list.scrollAmount();
-        rebuildWidgets();
-        list.setScrollAmount(scroll);
+        UnidSettingsScreen screen = new UnidSettingsScreen(lastScreen);
+        minecraft.setScreen(screen);
+        screen.list.setScrollAmount(scroll);
     }
 
     private void addLook(String title, Look look) {
