@@ -42,6 +42,8 @@ public final class UnidAddon implements ClientModInitializer {
             dispatcher.register(command("sls"));
         });
 
+        BankDuplicateList.register();
+
         KeyBindingHelper.registerKeyBinding(BlacklistFeature.TOGGLE_KEY);
         KeyBindingHelper.registerKeyBinding(BlacklistFeature.FAVORITE_KEY);
         KeyBindingHelper.registerKeyBinding(BlacklistFeature.MARK_PREVIOUS_KEY);

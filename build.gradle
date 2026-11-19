@@ -25,6 +25,7 @@ dependencies {
     modImplementation("maven.modrinth:wynntils:v${wynntils_version}-fabric")
     modImplementation(fabricApi.module("fabric-command-api-v2", fabric_api_version))
     modImplementation(fabricApi.module("fabric-key-binding-api-v1", fabric_api_version))
+    modImplementation(fabricApi.module("fabric-screen-api-v1", fabric_api_version))
     // The released jar holds WynnVentory's API key, so the mod uses its price fetches instead of its own.
     modImplementation("maven.modrinth:wynnventory:$wynnventory_modrinth_id")
 

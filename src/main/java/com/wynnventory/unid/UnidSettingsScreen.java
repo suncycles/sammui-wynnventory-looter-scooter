@@ -3,6 +3,7 @@ package com.wynnventory.unid;
 import com.wynnventory.unid.UnidSettings.Fill;
 import com.wynnventory.unid.UnidSettings.Look;
 import com.wynnventory.unid.UnidSettings.Marker;
+import com.wynnventory.unid.UnidSettings.MythicEffect;
 import com.wynnventory.unid.UnidSettings.PriceMetric;
 import com.wynnventory.unid.UnidSettings.Shape;
 import java.text.DecimalFormat;
@@ -14,6 +15,8 @@ import java.util.function.Consumer;
 import java.util.function.IntConsumer;
 import java.util.function.IntSupplier;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.OptionInstance;
+import net.minecraft.client.Options;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
@@ -77,6 +80,55 @@ public class UnidSettingsScreen extends OptionsSubScreen {
                         "Box EV counts possible items priced under the min unid price as worth nothing,"
                                 + " since you'd throw them away.")))
                 .create(Component.literal("Cheap items worth 0"), (button, on) -> settings.setZeroUnderMinPrice(on))));
+
+        list.addHeader(Component.literal("Mythic box"));
+        // Captions are translation keys; with no translation, they show as written.
+        OptionInstance<Integer> size = new OptionInstance<>(
+                "Box size",
+                OptionInstance.noTooltip(),
+                (caption, tenths) -> Options.genericValueLabel(caption, Component.literal(tenths / 10.0 + "×")),
+                new OptionInstance.IntRange(10, 40),
+                Math.round(settings.getMythicSize() * 10),
+                tenths -> settings.setMythicSize(tenths / 10f));
+        OptionInstance<Integer> volume = new OptionInstance<>(
+                "Growl volume",
+                OptionInstance.noTooltip(),
+                (caption, percent) ->
+                        Options.genericValueLabel(caption, Component.literal(percent == 0 ? "Off" : percent + "%")),
+                new OptionInstance.IntRange(0, 100),
+                settings.getMythicVolume(),
+                settings::setMythicVolume);
+        list.addSmall(
+                cycle("Effect", MythicEffect.values(), settings.getMythicEffect(), settings::setMythicEffect),
+                size.createButton(minecraft.options));
+        list.addSmall(
+                volume.createButton(minecraft.options),
+                Button.builder(Component.literal("Test growl"), button -> MythicBoxFeature.growl())
+                        .width(WIDTH)
+                        .build());
+
+        list.addHeader(Component.literal("Bank duplicates"));
+        OptionInstance<Integer> rows = new OptionInstance<>(
+                "Rows",
+                OptionInstance.noTooltip(),
+                (caption, count) -> Options.genericValueLabel(caption, count),
+                new OptionInstance.IntRange(1, 30),
+                settings.getBankDuplicateRows(),
+                settings::setBankDuplicateRows);
+        list.addSmall(
+                CycleButton.onOffBuilder(settings.isShowBankDuplicates())
+                        .withTooltip(on -> Tooltip.create(Component.literal(
+                                "In any bank menu, lists the unidentified items you own more than one of. With"
+                                        + " WynnExtras it counts every character's banks and inventories, otherwise"
+                                        + " the open page and your inventory. Drag the list to move it.")))
+                        .create(Component.literal("Show list"), (button, on) -> settings.setShowBankDuplicates(on)),
+                rows.createButton(minecraft.options));
+        list.addSmall(List.of(Button.builder(Component.literal("Reset list position"), button -> {
+                    settings.setBankListX(null);
+                    settings.setBankListY(null);
+                })
+                .width(WIDTH)
+                .build()));
 
         list.addHeader(Component.literal("Ingredients"));
         list.addSmall(

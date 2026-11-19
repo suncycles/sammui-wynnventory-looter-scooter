@@ -62,6 +62,13 @@ public final class UnidSettings {
         }
     }
 
+    /** What plays around a mythic gear box found in a reward chest. */
+    public enum MythicEffect {
+        RINGS,
+        RAYS,
+        OFF
+    }
+
     /** How one kind of slot is drawn; the shape and fill use its color, the marker its own. */
     public static final class Look {
         private Shape shape;
@@ -137,6 +144,14 @@ public final class UnidSettings {
     private int ingredientMinPrice = 2048; // 32 EB
     private List<String> blacklist = new ArrayList<>();
     private List<String> favorites = new ArrayList<>();
+    private MythicEffect mythicEffect = MythicEffect.RINGS;
+    private float mythicSize = 2;
+    private int mythicVolume = 70; // percent
+    private boolean showBankDuplicates = true;
+    private int bankDuplicateRows = 30;
+    // Where the list was dragged to, in GUI pixels from the top left; null until it's moved.
+    private Integer bankListX;
+    private Integer bankListY;
 
     public static UnidSettings get() {
         return instance;
@@ -249,6 +264,66 @@ public final class UnidSettings {
 
     public void setIngredientMinPrice(int ingredientMinPrice) {
         this.ingredientMinPrice = ingredientMinPrice;
+    }
+
+    public MythicEffect getMythicEffect() {
+        // Gson reads a misspelled effect in the file as null.
+        return mythicEffect == null ? MythicEffect.RINGS : mythicEffect;
+    }
+
+    public void setMythicEffect(MythicEffect mythicEffect) {
+        this.mythicEffect = mythicEffect;
+    }
+
+    /** How many times its normal size a found mythic box is drawn, 1 to 4. */
+    public float getMythicSize() {
+        return Math.clamp(mythicSize, 1, 4);
+    }
+
+    public void setMythicSize(float mythicSize) {
+        this.mythicSize = mythicSize;
+    }
+
+    /** The growl's volume in percent; 0 is silent. */
+    public int getMythicVolume() {
+        return Math.clamp(mythicVolume, 0, 100);
+    }
+
+    public void setMythicVolume(int mythicVolume) {
+        this.mythicVolume = mythicVolume;
+    }
+
+    public boolean isShowBankDuplicates() {
+        return showBankDuplicates;
+    }
+
+    public void setShowBankDuplicates(boolean showBankDuplicates) {
+        this.showBankDuplicates = showBankDuplicates;
+    }
+
+    /** How many duplicates the bank list shows at most, 1 to 30. */
+    public int getBankDuplicateRows() {
+        return Math.clamp(bankDuplicateRows, 1, 30);
+    }
+
+    public void setBankDuplicateRows(int bankDuplicateRows) {
+        this.bankDuplicateRows = bankDuplicateRows;
+    }
+
+    public Integer getBankListX() {
+        return bankListX;
+    }
+
+    public void setBankListX(Integer bankListX) {
+        this.bankListX = bankListX;
+    }
+
+    public Integer getBankListY() {
+        return bankListY;
+    }
+
+    public void setBankListY(Integer bankListY) {
+        this.bankListY = bankListY;
     }
 
     public List<String> getBlacklist() {

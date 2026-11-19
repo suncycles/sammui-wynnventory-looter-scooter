@@ -21,6 +21,7 @@
     "wynntils": ">=$wynntils_version",
     "wynnventory": "$wynnventory_version",
     "fabric-command-api-v2": "*",
-    "fabric-key-binding-api-v1": "*"
+    "fabric-key-binding-api-v1": "*",
+    "fabric-screen-api-v1": "*"
   }
 }

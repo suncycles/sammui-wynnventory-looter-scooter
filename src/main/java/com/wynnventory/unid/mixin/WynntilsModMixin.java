@@ -3,6 +3,7 @@ package com.wynnventory.unid.mixin;
 import com.wynntils.core.WynntilsMod;
 import com.wynnventory.unid.BlacklistFeature;
 import com.wynnventory.unid.ChestCloseGuard;
+import com.wynnventory.unid.MythicBoxFeature;
 import com.wynnventory.unid.UnidHighlightFeature;
 import java.io.File;
 import org.spongepowered.asm.mixin.Mixin;
@@ -25,5 +26,6 @@ public abstract class WynntilsModMixin {
         WynntilsMod.registerEventListener(new UnidHighlightFeature());
         WynntilsMod.registerEventListener(new ChestCloseGuard());
         WynntilsMod.registerEventListener(new BlacklistFeature());
+        WynntilsMod.registerEventListener(new MythicBoxFeature());
     }
 }
